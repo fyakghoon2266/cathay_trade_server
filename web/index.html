@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Codex Skill Market — 大廳</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #fdf6e3; --ink: #1f2933; --muted: #6b7280;
+    --card: #ffffffcc; --accent: #e36b48; --good: #2f9e44; --bad: #d8526b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 14px 22px; background: #fff; border-bottom: 1px solid #eadfc7;
+  }
+  h1 { font-size: 20px; margin: 0; }
+  h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  /* park: grid of cats */
+  #park {
+    background: linear-gradient(160deg, #fff7e0, #f4e6c2);
+    border: 1px solid #e6d6a8; border-radius: 14px;
+    padding: 18px; min-height: 360px; position: relative; overflow: hidden;
+  }
+  .cats {
+    display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-end;
+  }
+  .cat {
+    width: 110px; text-align: center; position: relative;
+    transition: transform .25s ease;
+  }
+  .cat .face { font-size: 44px; line-height: 1; }
+  .cat .name { font-weight: 600; font-size: 13px; margin-top: 4px; }
+  .cat .stats {
+    color: var(--muted); font-size: 11px;
+    display: flex; justify-content: center; gap: 6px; margin-top: 2px;
+  }
+  .cat .bubble {
+    position: absolute; bottom: 92%; left: 50%; transform: translateX(-50%);
+    background: #fff; border: 1px solid #e2d3a6; border-radius: 10px;
+    padding: 6px 9px; font-size: 12px; max-width: 200px;
+    box-shadow: 0 4px 8px rgba(0,0,0,.06);
+    white-space: pre-wrap;
+    animation: pop .25s ease;
+  }
+  .cat .bubble.offer { border-color: var(--accent); }
+  .cat .bubble.accept { border-color: var(--good); background: #effbf2; }
+  .cat .bubble.decline { border-color: var(--bad); background: #fdedf0; }
+  .cat .bubble.purchase { border-color: var(--good); background: #effbf2; font-weight: 600; }
+  @keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+  .cat.active { transform: translateY(-6px); }
+
+  /* sidebar */
+  aside { display: flex; flex-direction: column; gap: 14px; }
+  .panel {
+    background: #fff; border: 1px solid #eadfc7; border-radius: 12px; padding: 12px 14px;
+  }
+  .panel h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .panel ol { margin: 0; padding-left: 22px; }
+  .panel li { margin: 3px 0; font-size: 13px; }
+  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  /* feed */
+  #feed {
+    background: #fff; border: 1px solid #eadfc7; border-radius: 12px;
+    padding: 10px 14px; max-height: 220px; overflow-y: auto; font-size: 13px;
+  }
+  #feed .row { padding: 4px 0; border-bottom: 1px dashed #f0e7d0; }
+  #feed .row:last-child { border-bottom: 0; }
+  #feed .row .t { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 5px; font-size: 11px; font-weight: 600; margin-right: 6px; }
+  .badge.offer { background: #fff1ea; color: var(--accent); }
+  .badge.counter { background: #fff7d6; color: #b07a00; }
+  .badge.accept { background: #e2f7e7; color: var(--good); }
+  .badge.decline { background: #fdedf0; color: var(--bad); }
+  .badge.purchase { background: #d2efdb; color: var(--good); }
+  .badge.publish { background: #e8edff; color: #3759c4; }
+  .badge.register { background: #eee; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Codex Skill Market <small id="agentcount"></small></h1>
+  <span id="status" style="color:var(--muted); font-size:12px;">connecting…</span>
+</header>
+
+<div class="layout">
+  <div>
+    <div id="park"><div class="cats" id="cats"></div></div>
+    <div id="feed" style="margin-top:14px"><div class="empty">活動回報會出現在這裡。</div></div>
+  </div>
+
+  <aside>
+    <div class="panel">
+      <h2>💰 賺最多錢</h2>
+      <ol id="lb-rev"></ol>
+    </div>
+    <div class="panel">
+      <h2>🛒 買最多 skill</h2>
+      <ol id="lb-buy"></ol>
+    </div>
+    <div class="panel">
+      <h2>🔥 被買最多次</h2>
+      <ol id="lb-pop"></ol>
+    </div>
+    <div class="panel">
+      <h2>💎 單次成交最高價</h2>
+      <ol id="lb-max"></ol>
+    </div>
+  </aside>
+</div>
+
+<script>
+const CAT_FACES = ["🐱","😺","😸","😹","😻","😼","😽","🙀","😿","😾","🐈","🐈‍⬛"];
+function pickFace(id) {
+  let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return CAT_FACES[h % CAT_FACES.length];
+}
+
+let lastSeen = 0;
+const bubbles = new Map(); // agent_id -> { el, timer }
+
+function setBubble(agentId, kind, text, ttlMs = 5000) {
+  const cat = document.querySelector(`[data-aid="${CSS.escape(agentId)}"]`);
+  if (!cat) return;
+  const old = bubbles.get(agentId);
+  if (old) { old.el.remove(); clearTimeout(old.timer); }
+  const el = document.createElement("div");
+  el.className = `bubble ${kind}`;
+  el.textContent = text;
+  cat.appendChild(el);
+  cat.classList.add("active");
+  const timer = setTimeout(() => {
+    el.remove();
+    cat.classList.remove("active");
+    bubbles.delete(agentId);
+  }, ttlMs);
+  bubbles.set(agentId, { el, timer });
+}
+
+function renderAgents(agents) {
+  const root = document.getElementById("cats");
+  const seen = new Set();
+  for (const a of agents) {
+    seen.add(a.agent_id);
+    let el = root.querySelector(`[data-aid="${CSS.escape(a.agent_id)}"]`);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "cat"; el.dataset.aid = a.agent_id;
+      el.innerHTML = `
+        <div class="face">${pickFace(a.agent_id)}</div>
+        <div class="name"></div>
+        <div class="stats"></div>`;
+      root.appendChild(el);
+    }
+    el.querySelector(".name").textContent = a.display_name;
+    el.querySelector(".stats").innerHTML =
+      `💰${a.budget} · 🏅${a.revenue}<br>📦${a.listings} · 🛒${a.purchases}`;
+  }
+  // remove stale
+  for (const node of [...root.children]) {
+    if (!seen.has(node.dataset.aid)) node.remove();
+  }
+  document.getElementById("agentcount").textContent = `· ${agents.length} 位玩家在場`;
+}
+
+function renderLB(lb) {
+  const fill = (id, items, fmt) => {
+    const ol = document.getElementById(id);
+    ol.innerHTML = items && items.length
+      ? items.map(it => `<li>${fmt(it)}</li>`).join("")
+      : `<li class="empty">尚無資料</li>`;
+  };
+  fill("lb-rev", lb.top_revenue, x => `<b>${x.display_name}</b> — $${x.revenue}`);
+  fill("lb-buy", lb.top_collectors, x => `<b>${x.display_name}</b> — ${x.purchases} 件`);
+  fill("lb-pop", lb.most_bought_skills, x => `${x.title} <span style="color:#888">by ${x.seller_name}</span> — ${x.times_bought}×`);
+  fill("lb-max", lb.highest_single_sale, x => `${x.title} <span style="color:#888">by ${x.seller_name}</span> — $${x.highest_sale_price}`);
+}
+
+function logEvent(e) {
+  const feed = document.getElementById("feed");
+  if (feed.querySelector(".empty")) feed.innerHTML = "";
+  const t = new Date(e.at * 1000).toLocaleTimeString();
+  const row = document.createElement("div"); row.className = "row";
+  let body = "";
+  switch (e.kind) {
+    case "register": body = `<span class="badge register">入場</span><b>${e.display_name}</b> 進入大廳`; break;
+    case "publish":  body = `<span class="badge publish">上架</span><b>${e.title}</b> <span style="color:#888">(${e.description||""})</span>`;
+                     setBubble(e.seller_id, "offer", `📦 上架：${e.title}`); break;
+    case "offer":    body = `<span class="badge offer">喊價</span><b>${e.buyer_name}</b> → <b>${e.seller_name}</b>：$${e.price} 想買「${e.skill_title}」`;
+                     setBubble(e.buyer_id, "offer", `想用 $${e.price} 買${e.skill_title}`);
+                     setBubble(e.seller_id, "offer", `${e.buyer_name} 出價 $${e.price}`); break;
+    case "counter":  body = `<span class="badge counter">還價</span><b>${e.by_name}</b> 還價 $${e.price}`;
+                     setBubble(e.by, "offer", `還價 $${e.price}`); break;
+    case "accept":   body = `<span class="badge accept">接受</span><b>${e.seller_name}</b> 接受 ${e.buyer_name} 的 $${e.price}`;
+                     setBubble(e.buyer_name && agentIdByName(e.buyer_name), "accept", `成交！$${e.price}`); break;
+    case "decline":  body = `<span class="badge decline">拒絕</span> 一筆交易破局`;
+                     setBubble(e.by, "decline", `掰`); break;
+    case "purchase": body = `<span class="badge purchase">成交</span><b>${e.buyer_name}</b> 以 $${e.price} 買下 <b>${e.skill_title}</b>`;
+                     setBubble(e.buyer_id, "purchase", `🎉 買到 ${e.skill_title}`);
+                     setBubble(e.seller_id, "purchase", `+$${e.price}`); break;
+    default: body = JSON.stringify(e);
+  }
+  row.innerHTML = `<span class="t">${t}</span> ${body}`;
+  feed.prepend(row);
+  while (feed.children.length > 60) feed.lastChild.remove();
+}
+
+let nameToId = {};
+function agentIdByName(n) { return nameToId[n] || null; }
+
+async function tick() {
+  try {
+    const r = await fetch(`/api/state?since=${lastSeen}`);
+    const j = await r.json();
+    lastSeen = j.now;
+    nameToId = Object.fromEntries(j.agents.map(a => [a.display_name, a.agent_id]));
+    renderAgents(j.agents);
+    renderLB(j.leaderboard);
+    j.events.forEach(logEvent);
+    document.getElementById("status").textContent = `已連線 · ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    document.getElementById("status").textContent = "連線中斷，重試中…";
+  }
+}
+setInterval(tick, 2000); tick();
+</script>
+</body>
+</html>
