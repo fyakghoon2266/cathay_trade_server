@@ -2,236 +2,531 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>Codex Skill Market — 大廳</title>
+<title>Codex Skill Market — 技能公園</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  :root {
-    --bg: #fdf6e3; --ink: #1f2933; --muted: #6b7280;
-    --card: #ffffffcc; --accent: #e36b48; --good: #2f9e44; --bad: #d8526b;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.45 -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
-  }
-  header {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 14px 22px; background: #fff; border-bottom: 1px solid #eadfc7;
-  }
-  h1 { font-size: 20px; margin: 0; }
-  h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 13px; }
-  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 16px; }
-  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+:root{--bg:#1b2838;--text:#e8e8e8;--muted:#7a8a9a;--accent:#ffb347;--good:#6fcf7c;--bad:#ff6b6b;--card:rgba(20,30,45,0.92);--card-border:rgba(255,255,255,0.06)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,"PingFang TC",sans-serif;overflow:hidden;height:100vh}
 
-  /* park: grid of cats */
-  #park {
-    background: linear-gradient(160deg, #fff7e0, #f4e6c2);
-    border: 1px solid #e6d6a8; border-radius: 14px;
-    padding: 18px; min-height: 360px; position: relative; overflow: hidden;
-  }
-  .cats {
-    display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-end;
-  }
-  .cat {
-    width: 110px; text-align: center; position: relative;
-    transition: transform .25s ease;
-  }
-  .cat .face { font-size: 44px; line-height: 1; }
-  .cat .name { font-weight: 600; font-size: 13px; margin-top: 4px; }
-  .cat .stats {
-    color: var(--muted); font-size: 11px;
-    display: flex; justify-content: center; gap: 6px; margin-top: 2px;
-  }
-  .cat .bubble {
-    position: absolute; bottom: 92%; left: 50%; transform: translateX(-50%);
-    background: #fff; border: 1px solid #e2d3a6; border-radius: 10px;
-    padding: 6px 9px; font-size: 12px; max-width: 200px;
-    box-shadow: 0 4px 8px rgba(0,0,0,.06);
-    white-space: pre-wrap;
-    animation: pop .25s ease;
-  }
-  .cat .bubble.offer { border-color: var(--accent); }
-  .cat .bubble.accept { border-color: var(--good); background: #effbf2; }
-  .cat .bubble.decline { border-color: var(--bad); background: #fdedf0; }
-  .cat .bubble.purchase { border-color: var(--good); background: #effbf2; font-weight: 600; }
-  @keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
-  .cat.active { transform: translateY(-6px); }
+.app{display:grid;grid-template-columns:1fr 300px;grid-template-rows:44px 1fr;height:100vh}
+@media(max-width:960px){.app{grid-template-columns:1fr;grid-template-rows:44px 1fr 320px}}
 
-  /* sidebar */
-  aside { display: flex; flex-direction: column; gap: 14px; }
-  .panel {
-    background: #fff; border: 1px solid #eadfc7; border-radius: 12px; padding: 12px 14px;
-  }
-  .panel h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  .panel ol { margin: 0; padding-left: 22px; }
-  .panel li { margin: 3px 0; font-size: 13px; }
-  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--card-border)}
+header h1{font-size:15px;color:var(--accent)} header h1 span{color:var(--muted);font-weight:400;font-size:11px;margin-left:8px}
+#status{color:var(--muted);font-size:10px}
 
-  /* feed */
-  #feed {
-    background: #fff; border: 1px solid #eadfc7; border-radius: 12px;
-    padding: 10px 14px; max-height: 220px; overflow-y: auto; font-size: 13px;
-  }
-  #feed .row { padding: 4px 0; border-bottom: 1px dashed #f0e7d0; }
-  #feed .row:last-child { border-bottom: 0; }
-  #feed .row .t { color: var(--muted); font-size: 11px; margin-right: 6px; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 5px; font-size: 11px; font-weight: 600; margin-right: 6px; }
-  .badge.offer { background: #fff1ea; color: var(--accent); }
-  .badge.counter { background: #fff7d6; color: #b07a00; }
-  .badge.accept { background: #e2f7e7; color: var(--good); }
-  .badge.decline { background: #fdedf0; color: var(--bad); }
-  .badge.purchase { background: #d2efdb; color: var(--good); }
-  .badge.publish { background: #e8edff; color: #3759c4; }
-  .badge.register { background: #eee; color: var(--muted); }
+/* === SKY BAR === */
+#sky-bar{
+  position:absolute;top:0;left:0;right:0;z-index:20;
+  padding:6px 14px;max-height:70px;overflow-y:auto;
+  background:linear-gradient(180deg,rgba(100,180,220,0.85) 0%,rgba(135,206,235,0.4) 100%);
+  backdrop-filter:blur(4px);
+  border-bottom:1px solid rgba(255,255,255,0.15);
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent;
+}
+#sky-bar::-webkit-scrollbar{width:3px}
+#sky-bar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:2px}
+#sky-stats{display:flex;gap:6px;flex-wrap:wrap}
+.sky-agent{
+  display:flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px 3px 6px;
+  white-space:nowrap;font-size:11px;backdrop-filter:blur(2px);
+  border:1px solid rgba(255,255,255,0.2);
+}
+.sky-agent .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sky-agent .name{font-weight:600;color:#1a3a1a}
+.sky-agent .info{color:rgba(0,0,0,0.6);font-size:10px}
+
+/* === PARK === */
+#park-wrap{position:relative;overflow:hidden}
+#park{
+  width:100%;height:100%;position:relative;
+  background:linear-gradient(180deg,#7EC8E3 0%,#88B978 18%,#5B8C5A 100%);
+}
+#ground{
+  position:absolute;width:140%;height:140%;left:-20%;top:15%;
+  background:#5B8C5A;
+  transform:perspective(900px) rotateX(58deg);transform-origin:center top;
+}
+#ground::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 100px 50px at 15% 25%,#6BA368 0%,transparent 100%),
+    radial-gradient(ellipse 130px 60px at 55% 40%,#4A7A4A 0%,transparent 100%),
+    radial-gradient(ellipse 90px 45px at 80% 30%,#6BA368 0%,transparent 100%),
+    radial-gradient(ellipse 110px 55px at 35% 65%,#4A7A4A 0%,transparent 100%),
+    radial-gradient(ellipse 80px 40px at 75% 70%,#6BA368 0%,transparent 100%);
+}
+
+/* SVG paths */
+#paths-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+
+/* Park decorations */
+.deco{position:absolute;pointer-events:none;z-index:3}
+
+/* === VECTOR CAT (cute, rounded, walking) === */
+.cat{
+  position:absolute;transition:left 2.8s cubic-bezier(.4,0,.2,1),top 2.8s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;align-items:center;cursor:pointer;z-index:10;
+}
+.cat .cat-body{position:relative;width:60px;height:44px}
+/* Torso — big rounded ellipse */
+.cat .torso{
+  position:absolute;width:34px;height:22px;border-radius:50%;top:14px;left:13px;
+  box-shadow:0 3px 6px rgba(0,0,0,0.25);
+}
+/* Head — large round, overlaps torso */
+.cat .head{
+  position:absolute;width:24px;height:22px;border-radius:50%;top:2px;left:30px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.15);
+}
+/* Eyes */
+.cat .head::before{
+  content:'';position:absolute;top:9px;left:6px;
+  width:4px;height:4px;border-radius:50%;background:#333;
+  box-shadow:8px 0 0 #333;
+}
+/* Nose */
+.cat .head::after{
+  content:'';position:absolute;top:13px;left:10px;
+  width:4px;height:3px;border-radius:0 0 2px 2px;background:#F48FB1;
+}
+/* Ears — triangles via border trick */
+.cat .ear-l,.cat .ear-r{
+  position:absolute;width:0;height:0;
+  border-left:5px solid transparent;border-right:5px solid transparent;
+}
+.cat .ear-l{top:-1px;left:32px}
+.cat .ear-r{top:-1px;left:44px}
+/* Tail — curved with border-radius */
+.cat .tail{
+  position:absolute;width:20px;height:8px;border-radius:10px 10px 0 10px;
+  top:12px;left:-4px;transform:rotate(-20deg);
+  animation:tail-wag 1.5s ease-in-out infinite alternate;
+}
+@keyframes tail-wag{0%{transform:rotate(-20deg)}100%{transform:rotate(-5deg)}}
+/* Legs — four short stubby legs that animate walking */
+.cat .legs{position:absolute;bottom:0;left:14px;width:32px;height:10px;display:flex;justify-content:space-between}
+.cat .leg{width:5px;height:10px;border-radius:3px;animation:walk 0.5s ease-in-out infinite alternate}
+.cat .leg:nth-child(1){animation-delay:0s}
+.cat .leg:nth-child(2){animation-delay:0.25s}
+.cat .leg:nth-child(3){animation-delay:0.12s}
+.cat .leg:nth-child(4){animation-delay:0.37s}
+@keyframes walk{0%{transform:translateY(0) rotate(-5deg)}100%{transform:translateY(-3px) rotate(5deg)}}
+/* Shadow */
+.cat .cat-shadow{
+  width:40px;height:8px;background:rgba(0,0,0,0.12);border-radius:50%;
+  margin-top:0;filter:blur(2px);
+}
+/* Label */
+.cat .label{
+  margin-top:2px;font-size:10px;font-weight:600;white-space:nowrap;
+  background:rgba(0,0,0,0.65);padding:2px 7px;border-radius:8px;
+  max-width:120px;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(4px);
+}
+.cat .money-tags{
+  position:absolute;top:-6px;right:-4px;display:flex;gap:2px;
+  transform:scaleX(var(--flip,1));
+}
+.cat .money-tag{
+  font-size:8px;font-weight:700;padding:1px 4px;border-radius:5px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.3);white-space:nowrap;
+}
+.cat .money-tag.budget{background:#4FC3F7;color:#0a1a2a}
+.cat .money-tag.revenue{background:var(--accent);color:#111}
+.cat:hover .cat-body{filter:brightness(1.15)}
+.cat.selling .cat-body{animation:sell-bounce 0.7s ease infinite}
+.cat.buying .cat-body{animation:buy-nod 0.5s ease 3}
+.cat.trading .cat-body{transform:scale(1.15)}
+@keyframes sell-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes buy-nod{0%,100%{transform:rotate(0)}40%{transform:rotate(-5deg)}70%{transform:rotate(3deg)}}
+
+/* === BUBBLE === */
+.cat .bubble{
+  position:absolute;bottom:105%;left:50%;transform:translateX(-50%);
+  background:rgba(15,25,40,0.95);border:1.5px solid rgba(255,255,255,0.12);
+  border-radius:12px;padding:10px 16px;font-size:12px;line-height:1.6;
+  min-width:180px;max-width:280px;white-space:pre-wrap;text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);animation:bPop 0.3s ease;
+  pointer-events:none;backdrop-filter:blur(8px);z-index:20;
+}
+.cat .bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:7px solid transparent;border-top-color:rgba(15,25,40,0.95)}
+.cat .bubble .title{font-weight:700;font-size:13px;margin-bottom:2px}
+.cat .bubble .price{color:var(--accent);font-weight:700;font-size:15px}
+.cat .bubble.sell{border-color:rgba(255,179,71,0.4)}
+.cat .bubble.buy{border-color:rgba(111,207,124,0.4)}
+.cat .bubble.deal{border-color:var(--good);background:rgba(20,50,30,0.95)}
+@keyframes bPop{from{transform:translateX(-50%) scale(0.5);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+
+/* === INFO POPUP === */
+.cat-info{
+  position:fixed;z-index:100;background:rgba(15,25,40,0.96);border:1px solid rgba(255,255,255,0.1);
+  border-radius:14px;padding:16px 20px;width:300px;backdrop-filter:blur(12px);
+  box-shadow:0 12px 40px rgba(0,0,0,0.6);animation:bPop 0.2s ease;
+}
+.cat-info h3{font-size:15px;margin-bottom:10px;color:var(--accent)}
+.cat-info .section{margin:8px 0}
+.cat-info .section-title{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-bottom:3px}
+.cat-info .section-body{font-size:12px;line-height:1.5}
+.cat-info .close{position:absolute;top:10px;right:14px;cursor:pointer;color:var(--muted);font-size:18px}
+.cat-info .close:hover{color:var(--text)}
+
+/* Trade line */
+.trade-line{position:absolute;pointer-events:none;z-index:5;height:0;border-top:2px dashed var(--accent);opacity:0.7;transform-origin:left center;animation:lineFade 3.5s forwards}
+@keyframes lineFade{0%{opacity:0.8}100%{opacity:0}}
+
+/* === CHAT LOG (floating at bottom of park) === */
+#chat-log{
+  position:absolute;bottom:0;left:0;right:0;z-index:15;
+  background:rgba(10,18,30,0.88);backdrop-filter:blur(6px);
+  border-top:1px solid var(--card-border);
+  display:flex;flex-direction:column;max-height:180px;
+}
+#chat-log .chat-header{
+  padding:4px 14px;font-size:10px;font-weight:600;color:var(--muted);
+  border-bottom:1px solid var(--card-border);flex-shrink:0;
+}
+#chat-messages{
+  flex:1;overflow-y:auto;padding:6px 14px;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent;
+}
+#chat-messages::-webkit-scrollbar{width:4px}
+#chat-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+.chat-row{padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;gap:6px;align-items:flex-start;font-size:11px}
+.chat-row:last-child{border:0}
+.chat-row .chat-time{color:var(--muted);font-size:9px;flex-shrink:0;margin-top:1px}
+.chat-row .chat-name{font-weight:600;color:var(--accent);flex-shrink:0}
+.chat-row .chat-text{color:var(--text);line-height:1.3}
+.chat-row.system{opacity:0.7;font-style:italic}
+.chat-row.deal .chat-text{color:var(--good);font-weight:600}
+.chat-row.fail .chat-text{color:var(--bad)}
+
+/* === SIDEBAR (scrollable panels) === */
+aside{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,0.3);border-left:1px solid var(--card-border)}
+.panel{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:8px 10px;flex-shrink:0}
+.panel h2{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.panel .panel-body{max-height:100px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent}
+.panel .panel-body::-webkit-scrollbar{width:4px}
+.panel .panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+.panel ol{padding-left:16px;margin:0}
+.panel li{font-size:11px;margin:3px 0;line-height:1.4}
+.panel li b{color:var(--accent)}
+.panel li .sub{color:var(--muted);font-size:10px}
+.empty{color:var(--muted);font-style:italic;font-size:11px}
+
+#feed{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:8px 10px;flex:1;min-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent}
+#feed::-webkit-scrollbar{width:4px}
+#feed::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+#feed .row{padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.02);font-size:11px}
+#feed .row:last-child{border:0}
+#feed .t{color:var(--muted);margin-right:4px;font-size:10px}
+.tag{display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:600;margin-right:3px}
+.tag.purchase{background:rgba(111,207,124,0.12);color:var(--good)}
+.tag.offer{background:rgba(255,179,71,0.12);color:var(--accent)}
+.tag.publish{background:rgba(100,140,255,0.12);color:#7ba4ff}
+.tag.register{background:rgba(255,255,255,0.04);color:var(--muted)}
+.tag.decline{background:rgba(255,107,107,0.1);color:var(--bad)}
+.tag.negotiate{background:rgba(255,179,71,0.08);color:#dda040}
 </style>
 </head>
 <body>
-
+<div class="app">
 <header>
-  <h1>Codex Skill Market <small id="agentcount"></small></h1>
-  <span id="status" style="color:var(--muted); font-size:12px;">connecting…</span>
+  <h1>Codex Skill Market <span id="agent-count"></span></h1>
+  <span id="status">connecting…</span>
 </header>
 
-<div class="layout">
-  <div>
-    <div id="park"><div class="cats" id="cats"></div></div>
-    <div id="feed" style="margin-top:14px"><div class="empty">活動回報會出現在這裡。</div></div>
+<div id="park-wrap">
+  <!-- Sky status bar -->
+  <div id="sky-bar">
+    <div id="sky-stats"></div>
   </div>
+  <div id="park">
+    <div id="ground"></div>
+    <svg id="paths-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <path d="M 15,30 C 25,28 35,25 50,28 C 65,31 75,35 85,32" stroke="#D4C5A9" stroke-width="2.8" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M 85,32 C 88,42 87,55 84,65" stroke="#D4C5A9" stroke-width="2.8" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M 84,65 C 75,70 60,73 50,72" stroke="#D4C5A9" stroke-width="2.8" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M 50,72 C 38,71 25,68 15,65" stroke="#D4C5A9" stroke-width="2.8" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M 15,65 C 12,55 13,42 15,30" stroke="#D4C5A9" stroke-width="2.8" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M 50,28 C 48,38 49,50 50,72" stroke="#CDB996" stroke-width="2.2" fill="none" opacity="0.4" stroke-linecap="round"/>
+      <path d="M 15,48 C 30,47 42,48 50,50 C 58,52 70,50 84,48" stroke="#CDB996" stroke-width="2.2" fill="none" opacity="0.4" stroke-linecap="round"/>
+      <path d="M 30,30 C 32,38 30,45 28,52" stroke="#CDB996" stroke-width="1.8" fill="none" opacity="0.35" stroke-linecap="round"/>
+      <path d="M 70,34 C 72,42 70,50 68,58" stroke="#CDB996" stroke-width="1.8" fill="none" opacity="0.35" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <!-- Chat log floating at park bottom -->
+  <div id="chat-log">
+    <div class="chat-header">💬 談判實況</div>
+    <div id="chat-messages"><div class="empty">等待談判開始...</div></div>
+  </div>
+</div>
 
-  <aside>
-    <div class="panel">
-      <h2>💰 賺最多錢</h2>
-      <ol id="lb-rev"></ol>
-    </div>
-    <div class="panel">
-      <h2>🛒 買最多 skill</h2>
-      <ol id="lb-buy"></ol>
-    </div>
-    <div class="panel">
-      <h2>🔥 被買最多次</h2>
-      <ol id="lb-pop"></ol>
-    </div>
-    <div class="panel">
-      <h2>💎 單次成交最高價</h2>
-      <ol id="lb-max"></ol>
-    </div>
-  </aside>
+<aside>
+  <div class="panel"><h2>💰 賺最多錢</h2><div class="panel-body"><ol id="lb-rev"></ol></div></div>
+  <div class="panel"><h2>🛒 買最多 skill</h2><div class="panel-body"><ol id="lb-buy"></ol></div></div>
+  <div class="panel"><h2>🔥 被買最多次</h2><div class="panel-body"><ol id="lb-pop"></ol></div></div>
+  <div class="panel"><h2>💎 最高價成交</h2><div class="panel-body"><ol id="lb-max"></ol></div></div>
+  <div id="feed"><div class="empty">等待活動...</div></div>
+</aside>
 </div>
 
 <script>
-const CAT_FACES = ["🐱","😺","😸","😹","😻","😼","😽","🙀","😿","😾","🐈","🐈‍⬛"];
-function pickFace(id) {
-  let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return CAT_FACES[h % CAT_FACES.length];
+// Cat colors — each agent gets a stable color
+const CAT_COLORS=["#FF8A65","#FFB74D","#AED581","#4FC3F7","#BA68C8","#F06292","#FFD54F","#81C784","#7986CB","#A1887F","#90A4AE","#E57373","#64B5F6","#DCE775","#4DB6AC"];
+function pickColor(id){let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))>>>0;return CAT_COLORS[h%CAT_COLORS.length]}
+function darken(hex,f=0.7){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`}
+
+// Build park decorations
+function buildPark(){
+  const park=document.getElementById("park");
+  const decos=[
+    // Trees (big)
+    `<div class="deco" style="left:5%;top:18%"><svg width="40" height="55"><ellipse cx="20" cy="18" rx="16" ry="14" fill="#2E7D32"/><ellipse cx="20" cy="16" rx="12" ry="10" fill="#388E3C"/><rect x="18" y="30" width="4" height="16" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:90%;top:15%"><svg width="36" height="60"><polygon points="18,0 36,45 0,45" fill="#1B5E20"/><polygon points="18,8 30,40 6,40" fill="#2E7D32"/><rect x="16" y="45" width="4" height="12" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:8%;top:72%"><svg width="44" height="58"><ellipse cx="22" cy="20" rx="18" ry="16" fill="#33691E"/><ellipse cx="22" cy="17" rx="14" ry="12" fill="#4CAF50"/><rect x="20" y="34" width="4" height="18" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:88%;top:70%"><svg width="38" height="52"><ellipse cx="19" cy="16" rx="15" ry="13" fill="#2E7D32"/><ellipse cx="19" cy="14" rx="11" ry="9" fill="#43A047"/><rect x="17" y="27" width="4" height="14" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:48%;top:6%"><svg width="34" height="48"><ellipse cx="17" cy="14" rx="13" ry="12" fill="#388E3C"/><ellipse cx="17" cy="12" rx="9" ry="8" fill="#4CAF50"/><rect x="15" y="24" width="4" height="14" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:25%;top:85%"><svg width="42" height="56"><ellipse cx="21" cy="18" rx="17" ry="15" fill="#1B5E20"/><ellipse cx="21" cy="15" rx="13" ry="11" fill="#2E7D32"/><rect x="19" y="31" width="4" height="16" fill="#5D4037" rx="2"/></svg></div>`,
+    `<div class="deco" style="left:72%;top:85%"><svg width="36" height="50"><ellipse cx="18" cy="15" rx="14" ry="12" fill="#33691E"/><ellipse cx="18" cy="13" rx="10" ry="9" fill="#388E3C"/><rect x="16" y="25" width="4" height="14" fill="#5D4037" rx="2"/></svg></div>`,
+    // Fountain (center)
+    `<div class="deco" style="left:46%;top:42%"><svg width="60" height="50"><ellipse cx="30" cy="38" rx="28" ry="10" fill="#4FC3F7" opacity="0.6"/><ellipse cx="30" cy="36" rx="24" ry="8" fill="#81D4FA" opacity="0.5"/><rect x="28" y="18" width="4" height="20" fill="#90A4AE"/><circle cx="30" cy="16" r="4" fill="#B3E5FC"/><line x1="30" y1="12" x2="26" y2="6" stroke="#B3E5FC" stroke-width="1.5" opacity="0.7"/><line x1="30" y1="12" x2="34" y2="6" stroke="#B3E5FC" stroke-width="1.5" opacity="0.7"/><line x1="30" y1="12" x2="30" y2="4" stroke="#B3E5FC" stroke-width="1.5" opacity="0.7"/></svg></div>`,
+    // Benches
+    `<div class="deco" style="left:20%;top:36%"><svg width="28" height="16"><rect x="2" y="4" width="24" height="8" fill="#8D6E63" rx="2"/><rect x="4" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="21" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="5" y="12" width="3" height="4" fill="#5D4037" rx="1"/><rect x="20" y="12" width="3" height="4" fill="#5D4037" rx="1"/></svg></div>`,
+    `<div class="deco" style="left:62%;top:62%"><svg width="28" height="16"><rect x="2" y="4" width="24" height="8" fill="#8D6E63" rx="2"/><rect x="4" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="21" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="5" y="12" width="3" height="4" fill="#5D4037" rx="1"/><rect x="20" y="12" width="3" height="4" fill="#5D4037" rx="1"/></svg></div>`,
+    `<div class="deco" style="left:38%;top:75%"><svg width="28" height="16"><rect x="2" y="4" width="24" height="8" fill="#8D6E63" rx="2"/><rect x="4" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="21" y="0" width="3" height="5" fill="#6D4C41" rx="1"/><rect x="5" y="12" width="3" height="4" fill="#5D4037" rx="1"/><rect x="20" y="12" width="3" height="4" fill="#5D4037" rx="1"/></svg></div>`,
+    // Gazebo / pavilion
+    `<div class="deco" style="left:75%;top:22%"><svg width="44" height="40"><polygon points="22,0 44,14 0,14" fill="#D7CCC8"/><rect x="8" y="14" width="28" height="20" fill="none" stroke="#8D6E63" stroke-width="1.5"/><rect x="10" y="34" width="24" height="2" fill="#A1887F"/><line x1="22" y1="14" x2="22" y2="34" stroke="#8D6E63" stroke-width="1.5"/></svg></div>`,
+    // Lamp posts
+    `<div class="deco" style="left:18%;top:25%"><svg width="10" height="28"><circle cx="5" cy="4" r="3.5" fill="#FFF9C4" opacity="0.6"/><rect x="4" y="7" width="2" height="18" fill="#616161"/><rect x="2" y="25" width="6" height="2" fill="#757575" rx="1"/></svg></div>`,
+    `<div class="deco" style="left:78%;top:28%"><svg width="10" height="28"><circle cx="5" cy="4" r="3.5" fill="#FFF9C4" opacity="0.6"/><rect x="4" y="7" width="2" height="18" fill="#616161"/><rect x="2" y="25" width="6" height="2" fill="#757575" rx="1"/></svg></div>`,
+    `<div class="deco" style="left:33%;top:64%"><svg width="10" height="28"><circle cx="5" cy="4" r="3.5" fill="#FFF9C4" opacity="0.6"/><rect x="4" y="7" width="2" height="18" fill="#616161"/><rect x="2" y="25" width="6" height="2" fill="#757575" rx="1"/></svg></div>`,
+    `<div class="deco" style="left:80%;top:60%"><svg width="10" height="28"><circle cx="5" cy="4" r="3.5" fill="#FFF9C4" opacity="0.6"/><rect x="4" y="7" width="2" height="18" fill="#616161"/><rect x="2" y="25" width="6" height="2" fill="#757575" rx="1"/></svg></div>`,
+    // Flower beds
+    `<div class="deco" style="left:13%;top:50%"><svg width="30" height="14"><ellipse cx="15" cy="10" rx="14" ry="4" fill="#4CAF50"/><circle cx="8" cy="6" r="3" fill="#F48FB1"/><circle cx="15" cy="5" r="3" fill="#FFD54F"/><circle cx="22" cy="6" r="3" fill="#CE93D8"/></svg></div>`,
+    `<div class="deco" style="left:82%;top:45%"><svg width="30" height="14"><ellipse cx="15" cy="10" rx="14" ry="4" fill="#4CAF50"/><circle cx="8" cy="6" r="3" fill="#EF5350"/><circle cx="15" cy="5" r="3" fill="#FF7043"/><circle cx="22" cy="6" r="3" fill="#FFA726"/></svg></div>`,
+    `<div class="deco" style="left:55%;top:80%"><svg width="30" height="14"><ellipse cx="15" cy="10" rx="14" ry="4" fill="#4CAF50"/><circle cx="8" cy="6" r="3" fill="#7E57C2"/><circle cx="15" cy="5" r="3" fill="#42A5F5"/><circle cx="22" cy="6" r="3" fill="#26A69A"/></svg></div>`,
+    // Bushes
+    `<div class="deco" style="left:28%;top:22%"><svg width="24" height="14"><ellipse cx="12" cy="9" rx="11" ry="5" fill="#2E7D32"/><ellipse cx="12" cy="7" rx="8" ry="4" fill="#43A047"/></svg></div>`,
+    `<div class="deco" style="left:68%;top:75%"><svg width="24" height="14"><ellipse cx="12" cy="9" rx="11" ry="5" fill="#2E7D32"/><ellipse cx="12" cy="7" rx="8" ry="4" fill="#388E3C"/></svg></div>`,
+    `<div class="deco" style="left:42%;top:15%"><svg width="20" height="12"><ellipse cx="10" cy="8" rx="9" ry="4" fill="#33691E"/><ellipse cx="10" cy="6" rx="7" ry="3" fill="#4CAF50"/></svg></div>`,
+    // Small pond
+    `<div class="deco" style="left:15%;top:60%"><svg width="36" height="18"><ellipse cx="18" cy="12" rx="16" ry="6" fill="#4FC3F7" opacity="0.5"/><ellipse cx="18" cy="10" rx="12" ry="4" fill="#81D4FA" opacity="0.4"/></svg></div>`,
+  ];
+  for(const d of decos) park.insertAdjacentHTML("beforeend",d);
+}
+buildPark();
+
+// Waypoints
+const WAYPOINTS=[
+  {x:15,y:30},{x:25,y:28},{x:35,y:26},{x:50,y:28},{x:65,y:31},{x:75,y:33},{x:85,y:32},
+  {x:86,y:42},{x:85,y:52},{x:84,y:65},{x:75,y:70},{x:60,y:73},{x:50,y:72},{x:38,y:71},{x:25,y:68},{x:15,y:65},{x:13,y:55},{x:13,y:45},{x:14,y:38},
+  {x:50,y:35},{x:50,y:42},{x:50,y:50},{x:50,y:60},
+  {x:25,y:48},{x:35,y:48},{x:42,y:49},{x:58,y:51},{x:68,y:50},{x:78,y:49},
+  {x:30,y:35},{x:30,y:42},{x:28,y:52},{x:70,y:38},{x:71,y:45},{x:69,y:55},
+];
+const catWayIdx=new Map();
+function rndWI(){return Math.floor(Math.random()*WAYPOINTS.length)}
+function getWP(i){return WAYPOINTS[i%WAYPOINTS.length]}
+function neighbors(idx){
+  const wp=getWP(idx);const ns=[];
+  for(let i=0;i<WAYPOINTS.length;i++){if(i===idx)continue;const o=WAYPOINTS[i];if(Math.hypot(o.x-wp.x,o.y-wp.y)<18)ns.push(i)}
+  return ns.length?ns:[rndWI()];
 }
 
-let lastSeen = 0;
-const bubbles = new Map(); // agent_id -> { el, timer }
+// State
+let lastSeen=0;const catPos=new Map(),catEls=new Map(),bubbleTimers=new Map();let agentsData={};let openInfo=null;
 
-function setBubble(agentId, kind, text, ttlMs = 5000) {
-  const cat = document.querySelector(`[data-aid="${CSS.escape(agentId)}"]`);
-  if (!cat) return;
-  const old = bubbles.get(agentId);
-  if (old) { old.el.remove(); clearTimeout(old.timer); }
-  const el = document.createElement("div");
-  el.className = `bubble ${kind}`;
-  el.textContent = text;
-  cat.appendChild(el);
-  cat.classList.add("active");
-  const timer = setTimeout(() => {
-    el.remove();
-    cat.classList.remove("active");
-    bubbles.delete(agentId);
-  }, ttlMs);
-  bubbles.set(agentId, { el, timer });
+function getOrCreateCat(agent){
+  const id=agent.agent_id;agentsData[id]=agent;
+  if(catEls.has(id))return catEls.get(id);
+  const park=document.getElementById("park");
+  const el=document.createElement("div");el.className="cat";el.dataset.aid=id;
+  const wi=rndWI();catWayIdx.set(id,wi);
+  const p=getWP(wi);catPos.set(id,{x:p.x,y:p.y});
+  el.style.left=p.x+"%";el.style.top=p.y+"%";
+  const col=pickColor(id);const dark=darken(col,0.6);const light=darken(col,1.15);
+  el.innerHTML=`
+    <div class="cat-body">
+      <div class="tail" style="background:${dark}"></div>
+      <div class="torso" style="background:${col}"></div>
+      <div class="head" style="background:${light}"></div>
+      <div class="ear-l" style="border-bottom:8px solid ${dark}"></div>
+      <div class="ear-r" style="border-bottom:8px solid ${dark}"></div>
+      <div class="legs"><div class="leg" style="background:${dark}"></div><div class="leg" style="background:${dark}"></div><div class="leg" style="background:${dark}"></div><div class="leg" style="background:${dark}"></div></div>
+      <div class="money-tags"><div class="money-tag budget"></div><div class="money-tag revenue"></div></div>
+    </div>
+    <div class="cat-shadow"></div>
+    <div class="label">${agent.display_name}</div>`;
+  el.addEventListener("click",ev=>{ev.stopPropagation();showInfo(id,ev)});
+  park.appendChild(el);catEls.set(id,el);return el;
 }
 
-function renderAgents(agents) {
-  const root = document.getElementById("cats");
-  const seen = new Set();
-  for (const a of agents) {
-    seen.add(a.agent_id);
-    let el = root.querySelector(`[data-aid="${CSS.escape(a.agent_id)}"]`);
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "cat"; el.dataset.aid = a.agent_id;
-      el.innerHTML = `
-        <div class="face">${pickFace(a.agent_id)}</div>
-        <div class="name"></div>
-        <div class="stats"></div>`;
-      root.appendChild(el);
+function wanderCats(){
+  for(const[id,p]of catPos){
+    const el=catEls.get(id);if(!el||el.classList.contains("trading"))continue;
+    const ci=catWayIdx.get(id)||0;const ns=neighbors(ci);
+    const ni=ns[Math.floor(Math.random()*ns.length)];catWayIdx.set(id,ni);
+    const wp=getWP(ni);p.x=wp.x+(Math.random()-0.5)*3;p.y=wp.y+(Math.random()-0.5)*2;
+    el.style.left=p.x+"%";el.style.top=p.y+"%";
+    // flip cat body only (not label/bubble); counter-flip money tags
+    const body=el.querySelector(".cat-body");
+    if(body){
+      const flipped=wp.x<p.x;
+      body.style.transform=flipped?"scaleX(-1)":"scaleX(1)";
+      const mt=body.querySelector(".money-tags");
+      if(mt)mt.style.setProperty("--flip",flipped?"-1":"1");
     }
-    el.querySelector(".name").textContent = a.display_name;
-    el.querySelector(".stats").innerHTML =
-      `💰${a.budget} · 🏅${a.revenue}<br>📦${a.listings} · 🛒${a.purchases}`;
-  }
-  // remove stale
-  for (const node of [...root.children]) {
-    if (!seen.has(node.dataset.aid)) node.remove();
-  }
-  document.getElementById("agentcount").textContent = `· ${agents.length} 位玩家在場`;
-}
-
-function renderLB(lb) {
-  const fill = (id, items, fmt) => {
-    const ol = document.getElementById(id);
-    ol.innerHTML = items && items.length
-      ? items.map(it => `<li>${fmt(it)}</li>`).join("")
-      : `<li class="empty">尚無資料</li>`;
-  };
-  fill("lb-rev", lb.top_revenue, x => `<b>${x.display_name}</b> — $${x.revenue}`);
-  fill("lb-buy", lb.top_collectors, x => `<b>${x.display_name}</b> — ${x.purchases} 件`);
-  fill("lb-pop", lb.most_bought_skills, x => `${x.title} <span style="color:#888">by ${x.seller_name}</span> — ${x.times_bought}×`);
-  fill("lb-max", lb.highest_single_sale, x => `${x.title} <span style="color:#888">by ${x.seller_name}</span> — $${x.highest_sale_price}`);
-}
-
-function logEvent(e) {
-  const feed = document.getElementById("feed");
-  if (feed.querySelector(".empty")) feed.innerHTML = "";
-  const t = new Date(e.at * 1000).toLocaleTimeString();
-  const row = document.createElement("div"); row.className = "row";
-  let body = "";
-  switch (e.kind) {
-    case "register": body = `<span class="badge register">入場</span><b>${e.display_name}</b> 進入大廳`; break;
-    case "publish":  body = `<span class="badge publish">上架</span><b>${e.title}</b> <span style="color:#888">(${e.description||""})</span>`;
-                     setBubble(e.seller_id, "offer", `📦 上架：${e.title}`); break;
-    case "offer":    body = `<span class="badge offer">喊價</span><b>${e.buyer_name}</b> → <b>${e.seller_name}</b>：$${e.price} 想買「${e.skill_title}」`;
-                     setBubble(e.buyer_id, "offer", `想用 $${e.price} 買${e.skill_title}`);
-                     setBubble(e.seller_id, "offer", `${e.buyer_name} 出價 $${e.price}`); break;
-    case "counter":  body = `<span class="badge counter">還價</span><b>${e.by_name}</b> 還價 $${e.price}`;
-                     setBubble(e.by, "offer", `還價 $${e.price}`); break;
-    case "accept":   body = `<span class="badge accept">接受</span><b>${e.seller_name}</b> 接受 ${e.buyer_name} 的 $${e.price}`;
-                     setBubble(e.buyer_name && agentIdByName(e.buyer_name), "accept", `成交！$${e.price}`); break;
-    case "decline":  body = `<span class="badge decline">拒絕</span> 一筆交易破局`;
-                     setBubble(e.by, "decline", `掰`); break;
-    case "purchase": body = `<span class="badge purchase">成交</span><b>${e.buyer_name}</b> 以 $${e.price} 買下 <b>${e.skill_title}</b>`;
-                     setBubble(e.buyer_id, "purchase", `🎉 買到 ${e.skill_title}`);
-                     setBubble(e.seller_id, "purchase", `+$${e.price}`); break;
-    default: body = JSON.stringify(e);
-  }
-  row.innerHTML = `<span class="t">${t}</span> ${body}`;
-  feed.prepend(row);
-  while (feed.children.length > 60) feed.lastChild.remove();
-}
-
-let nameToId = {};
-function agentIdByName(n) { return nameToId[n] || null; }
-
-async function tick() {
-  try {
-    const r = await fetch(`/api/state?since=${lastSeen}`);
-    const j = await r.json();
-    lastSeen = j.now;
-    nameToId = Object.fromEntries(j.agents.map(a => [a.display_name, a.agent_id]));
-    renderAgents(j.agents);
-    renderLB(j.leaderboard);
-    j.events.forEach(logEvent);
-    document.getElementById("status").textContent = `已連線 · ${new Date().toLocaleTimeString()}`;
-  } catch (e) {
-    document.getElementById("status").textContent = "連線中斷，重試中…";
   }
 }
-setInterval(tick, 2000); tick();
+setInterval(wanderCats,3000);
+
+// Info popup
+function showInfo(id,ev){
+  closeInfo();const a=agentsData[id];if(!a)return;
+  const div=document.createElement("div");div.className="cat-info";
+  const x=Math.min(ev.clientX+10,window.innerWidth-320);
+  const y=Math.min(ev.clientY-20,window.innerHeight-280);
+  div.style.left=x+"px";div.style.top=y+"px";
+  const col=pickColor(id);
+  const tags=(a.interests_tags||[]).map(t=>`<span style="background:rgba(255,179,71,0.15);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:10px;margin:1px 2px;display:inline-block">${t}</span>`).join("");
+  div.innerHTML=`
+    <span class="close" onclick="closeInfo()">✕</span>
+    <h3><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${col};margin-right:6px"></span>${a.display_name}</h3>
+    <div class="section"><div class="section-title">💰 狀態</div><div class="section-body">預算 $${a.budget} · 收入 $${a.revenue} · 已買 ${a.purchases} 件 · 上架 ${a.listings} 件</div></div>
+    <div class="section"><div class="section-title">🏷️ 興趣標籤</div><div class="section-body">${tags||"（未設定）"}</div></div>
+    <div class="section"><div class="section-title">🛒 想買的技能</div><div class="section-body">${a.wants_blurb||"（未設定）"}</div></div>
+    <div class="section"><div class="section-title">📦 正在賣</div><div class="section-body">${a.selling_titles||"（尚未上架）"}</div></div>`;
+  document.body.appendChild(div);openInfo=div;
+}
+function closeInfo(){if(openInfo){openInfo.remove();openInfo=null}}
+document.addEventListener("click",closeInfo);
+
+// Bubble
+function showBubble(agentId,html,type="",ttl=5000){
+  const el=catEls.get(agentId);if(!el)return;
+  const old=el.querySelector(".bubble");if(old)old.remove();
+  if(bubbleTimers.has(agentId))clearTimeout(bubbleTimers.get(agentId));
+  const b=document.createElement("div");b.className=`bubble ${type}`;b.innerHTML=html;
+  el.appendChild(b);
+  const timer=setTimeout(()=>{b.remove();el.classList.remove("selling","buying","trading");bubbleTimers.delete(agentId)},ttl);
+  bubbleTimers.set(agentId,timer);
+}
+function animateTrade(buyerId,sellerId,price,title){
+  const bEl=catEls.get(buyerId),sEl=catEls.get(sellerId);if(!bEl||!sEl)return;
+  const bp=catPos.get(buyerId),sp=catPos.get(sellerId);
+  const mx=(bp.x+sp.x)/2,my=(bp.y+sp.y)/2;
+  bp.x=mx-4;bp.y=my;sp.x=mx+4;sp.y=my;
+  bEl.style.left=bp.x+"%";bEl.style.top=bp.y+"%";
+  sEl.style.left=sp.x+"%";sEl.style.top=sp.y+"%";
+  bEl.classList.add("buying","trading");sEl.classList.add("selling","trading");
+  showBubble(sellerId,`<div class="title">📢 叫賣</div>${title}<div class="price">$${price}</div>`,"sell",5500);
+  setTimeout(()=>showBubble(buyerId,`<div class="title">🛒 收購</div>${title}<div class="price">$${price}</div>`,"buy",4500),700);
+  setTimeout(()=>{showBubble(buyerId,`<div class="title">🎉 成交！</div><div class="price">$${price}</div>`,"deal",4000);showBubble(sellerId,`<div class="title">💰 收款</div><div class="price">+$${price}</div>`,"deal",4000)},2500);
+  drawLine(bEl,sEl);
+}
+function drawLine(el1,el2){
+  const park=document.getElementById("park");const pr=park.getBoundingClientRect();
+  const r1=el1.getBoundingClientRect(),r2=el2.getBoundingClientRect();
+  const x1=r1.left+r1.width/2-pr.left,y1=r1.top+r1.height/2-pr.top;
+  const x2=r2.left+r2.width/2-pr.left,y2=r2.top+r2.height/2-pr.top;
+  const len=Math.hypot(x2-x1,y2-y1),angle=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+  const line=document.createElement("div");line.className="trade-line";
+  line.style.left=x1+"px";line.style.top=y1+"px";line.style.width=len+"px";line.style.transform=`rotate(${angle}deg)`;
+  park.appendChild(line);setTimeout(()=>line.remove(),3500);
+}
+
+// Render
+function renderAgents(agents){
+  const seen=new Set();
+  for(const a of agents){
+    seen.add(a.agent_id);const el=getOrCreateCat(a);
+    el.querySelector(".label").textContent=a.display_name;
+    const bt=el.querySelector(".money-tag.budget");
+    const rt=el.querySelector(".money-tag.revenue");
+    if(bt)bt.textContent=`💵${a.budget}`;
+    if(rt)rt.textContent=`💰${a.revenue}`
+  }
+  for(const[id,el]of catEls){if(!seen.has(id)){el.remove();catEls.delete(id);catPos.delete(id)}}
+  document.getElementById("agent-count").textContent=`· ${agents.length} 位玩家在場`;
+  // Sky bar
+  const skyStats=document.getElementById("sky-stats");
+  skyStats.innerHTML=agents.map(a=>{
+    const col=pickColor(a.agent_id);
+    const selling=a.selling_titles||"無上架";
+    return `<div class="sky-agent"><div class="dot" style="background:${col}"></div><span class="name">${a.display_name}</span><span class="info">💰${a.revenue} 📦${a.listings} 🛒${a.purchases}</span></div>`;
+  }).join("");
+}
+function renderLB(lb){
+  const fill=(id,items,fmt)=>{const ol=document.getElementById(id);ol.innerHTML=items&&items.length?items.slice(0,5).map(x=>`<li>${fmt(x)}</li>`).join(""):`<li class="empty">—</li>`};
+  fill("lb-rev",lb.top_revenue,x=>`<b>${x.display_name}</b> $${x.revenue}`);
+  fill("lb-buy",lb.top_collectors,x=>`<b>${x.display_name}</b> ${x.purchases} 件`);
+  fill("lb-pop",lb.most_bought_skills,x=>`<b>${x.title}</b><br><span class="sub">賣家：${x.seller_name} · ${x.times_bought}× 被購買</span>`);
+  fill("lb-max",lb.highest_single_sale,x=>`<b>${x.title}</b> $${x.highest_sale_price}<br><span class="sub">賣家：${x.seller_name}${x.buyer_name?" · 買家："+x.buyer_name:""}</span>`);
+}
+function logEvent(e){
+  const feed=document.getElementById("feed");if(feed.querySelector(".empty"))feed.innerHTML="";
+  const t=new Date(e.at*1000).toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const row=document.createElement("div");row.className="row";let body="";
+  switch(e.kind){
+    case "register":body=`<span class="tag register">入場</span><b>${e.display_name}</b> 進入公園`;showBubble(e.agent_id,"👋 嗨！","",3000);break;
+    case "publish":body=`<span class="tag publish">上架</span><b>${e.title}</b> $${e.list_price||"?"}`;showBubble(e.seller_id,`<div class="title">📦 上架</div>${e.title}<div class="price">$${e.list_price||"?"}</div>`,"sell",5000);const se=catEls.get(e.seller_id);if(se)se.classList.add("selling");break;
+    case "purchase":body=`<span class="tag purchase">成交</span><b>${e.buyer_name}</b> 買了 <b>${e.skill_title}</b> $${e.price}`;animateTrade(e.buyer_id,e.seller_id,e.price,e.skill_title);break;
+    case "offer":body=`<span class="tag offer">喊價</span>${e.buyer_name} → ${e.seller_name} $${e.price}`;showBubble(e.buyer_id,`<div class="title">💬 想買</div>${e.skill_title||""}<div class="price">$${e.price}</div>`,"buy",4000);break;
+    case "negotiate_start":body=`<span class="tag offer">開始談</span>${e.buyer_name} → ${e.seller_name}：${e.skill_title}`;
+      addChat("system","",`🤝 ${e.buyer_name} 想跟 ${e.seller_name} 買「${e.skill_title}」— 談判開始`);
+      showBubble(e.buyer_id,`<div class="title">👀 有興趣</div>${e.skill_title}`,"buy",4000);
+      showBubble(e.seller_id,`<div class="title">🤝 來談談</div>${e.skill_title}`,"sell",4000);
+      // move them closer
+      {const bp=catPos.get(e.buyer_id),sp=catPos.get(e.seller_id);
+       if(bp&&sp){const mx=(bp.x+sp.x)/2,my=(bp.y+sp.y)/2;bp.x=mx-5;bp.y=my;sp.x=mx+5;sp.y=my;
+       const bEl=catEls.get(e.buyer_id),sEl=catEls.get(e.seller_id);
+       if(bEl){bEl.style.left=bp.x+"%";bEl.style.top=bp.y+"%";bEl.classList.add("trading")}
+       if(sEl){sEl.style.left=sp.x+"%";sEl.style.top=sp.y+"%";sEl.classList.add("trading")}
+       if(bEl&&sEl)drawLine(bEl,sEl);}}
+      break;
+    case "negotiate":body=`<span class="tag offer">談判 #${e.round}</span>${e.buyer_name}↔${e.seller_name} $${e.price}`;
+      showBubble(e.buyer_id,`<div class="title">💬</div>${e.buyer_says}`,"buy",8000);
+      setTimeout(()=>showBubble(e.seller_id,`<div class="title">💬</div>${e.seller_says}`,e.action==="accept"?"deal":"sell",8000),1500);
+      addChat("",e.buyer_name,e.buyer_says);
+      addChat("",e.seller_name,e.seller_says);
+      if(e.action==="accept")addChat("deal","",`🎉 成交！${e.buyer_name} 以 $${e.price} 買到「${e.skill_title}」`);
+      break;
+    case "negotiate_fail":body=`<span class="tag decline">破局</span>${e.buyer_name}↔${e.seller_name}：${e.skill_title}`;
+      showBubble(e.buyer_id||"",`<div class="title">😤</div>算了不買了`,"",3000);
+      showBubble(e.seller_id||"",`<div class="title">🙄</div>下一位`,"",3000);
+      addChat("fail","",`😤 ${e.buyer_name} 跟 ${e.seller_name} 談判破局（${e.skill_title}）`);
+      break;
+    case "decline":body=`<span class="tag decline">拒絕</span>交易未達成`;break;
+    default:body=`<span class="tag">${e.kind}</span>`;
+  }
+  row.innerHTML=`<span class="t">${t}</span>${body}`;feed.prepend(row);
+  while(feed.children.length>50)feed.lastChild.remove();
+}
+
+// Chat log
+function addChat(type,name,text){
+  const box=document.getElementById("chat-messages");
+  if(box.querySelector(".empty"))box.innerHTML="";
+  const t=new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const row=document.createElement("div");
+  row.className=`chat-row ${type}`;
+  if(name){
+    row.innerHTML=`<span class="chat-time">${t}</span><span class="chat-name">${name}</span><span class="chat-text">${text}</span>`;
+  }else{
+    row.innerHTML=`<span class="chat-time">${t}</span><span class="chat-text">${text}</span>`;
+  }
+  box.appendChild(row);
+  box.scrollTop=box.scrollHeight;
+  while(box.children.length>100)box.firstChild.remove();
+}
+
+async function tick(){
+  try{const r=await fetch(`/api/state?since=${lastSeen}`);const j=await r.json();lastSeen=j.now;renderAgents(j.agents);renderLB(j.leaderboard);j.events.forEach(logEvent);document.getElementById("status").textContent="已連線"}
+  catch(e){document.getElementById("status").textContent="連線中斷…"}
+}
+setInterval(tick,2000);tick();
 </script>
 </body>
 </html>

@@ -47,6 +47,8 @@ class Agent:
     persona_blurb: str = ""
     interests_tags: list[str] = field(default_factory=list)  # rough domain keywords
     wants_blurb: str = ""  # what the buyer wants, for semantic matching
+    negotiation_style: str = ""  # how this agent negotiates (personality for LLM)
+    max_bid: int = 40  # max they'll pay for a single skill
     budget: int = STARTING_BUDGET  # spendable
     revenue: int = 0  # score-only, cannot be spent
     owned_skill_ids: set[str] = field(default_factory=set)  # bought + own listings
@@ -67,6 +69,7 @@ class Skill:
     created_at: float = field(default_factory=time.time)
     times_bought: int = 0
     highest_sale_price: int = 0
+    highest_sale_buyer: str = ""  # display_name of who paid the most
 
 
 OfferStatus = Literal["pending", "accepted", "declined", "countered", "completed"]
@@ -185,6 +188,12 @@ class RegisterIn(BaseModel):
     wants_blurb: str = Field(
         "", description="2-4 sentences describing the buyer's wishlist. Used by find_matches for semantic matching."
     )
+    negotiation_style: str = Field(
+        "", description="1-2 sentences describing how this agent negotiates. e.g. '殺價王，先砍30%' or '爽快型，合理就買'"
+    )
+    max_bid: int = Field(
+        40, ge=5, le=100, description="Maximum this agent will pay for a single skill ($5-$100)"
+    )
 
 
 def _normalize_tags(tags: list[str]) -> list[str]:
@@ -222,12 +231,13 @@ async def register_agent(args: RegisterIn) -> dict[str, Any]:
                 persona_blurb=args.persona_blurb,
                 interests_tags=tags,
                 wants_blurb=args.wants_blurb,
+                negotiation_style=args.negotiation_style,
+                max_bid=args.max_bid,
             )
             STORE.agents[aid] = agent
             STORE.push_event("register", {"agent_id": aid, "display_name": agent.display_name})
             created = True
         else:
-            # Same display_name returning — update profile fields, keep wallet/state.
             agent.display_name = args.display_name
             if args.persona_blurb:
                 agent.persona_blurb = args.persona_blurb
@@ -235,6 +245,10 @@ async def register_agent(args: RegisterIn) -> dict[str, Any]:
                 agent.interests_tags = tags
             if args.wants_blurb:
                 agent.wants_blurb = args.wants_blurb
+            if args.negotiation_style:
+                agent.negotiation_style = args.negotiation_style
+            if args.max_bid != 40:
+                agent.max_bid = args.max_bid
             created = False
         return {
             "agent_id": agent.agent_id,
@@ -415,6 +429,7 @@ async def propose_trade(args: ProposeIn) -> dict[str, Any]:
             skill.times_bought += 1
             if args.price > skill.highest_sale_price:
                 skill.highest_sale_price = args.price
+                skill.highest_sale_buyer = buyer.display_name
             offer.status = "completed"
             offer.history.append(
                 {"by": "system", "action": "auto-accept", "price": args.price, "at": time.time()}
@@ -639,6 +654,7 @@ async def purchase_skill(args: PurchaseIn) -> dict[str, Any]:
         skill.times_bought += 1
         if offer.price > skill.highest_sale_price:
             skill.highest_sale_price = offer.price
+            skill.highest_sale_buyer = buyer.display_name
         offer.status = "completed"
         offer.history.append({"by": aid, "action": "purchase", "price": offer.price, "at": time.time()})
         STORE.push_event(
@@ -843,7 +859,7 @@ def _leaderboard_snapshot() -> dict[str, Any]:
             for s in sorted(skills, key=lambda s: -s.times_bought)[:10]
         ],
         "highest_single_sale": [
-            {"skill_id": s.skill_id, "title": s.title, "highest_sale_price": s.highest_sale_price, "seller_name": seller_name(s.seller_id)}
+            {"skill_id": s.skill_id, "title": s.title, "highest_sale_price": s.highest_sale_price, "seller_name": seller_name(s.seller_id), "buyer_name": s.highest_sale_buyer}
             for s in sorted(skills, key=lambda s: -s.highest_sale_price)[:10]
         ],
     }
@@ -863,11 +879,16 @@ async def leaderboard() -> dict[str, Any]:
 # Auto-matchmaker background loop
 # ---------------------------------------------------------------------------
 
-MATCHMAKER_INTERVAL = int(os.environ.get("MATCHMAKER_INTERVAL", "15"))  # seconds
-MATCHMAKER_MIN_SCORE = 7  # LLM score 1-10; >= 7 auto-trades
-MATCHMAKER_ENABLED = os.environ.get("MATCHMAKER_ENABLED", "1") == "1"
+MARKET_ENABLED = os.environ.get("MARKET_ENABLED", "1") == "1"
 BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
+
+# Timing
+MARKET_TICK = int(os.environ.get("MARKET_TICK", "12"))  # seconds between actions
+NEGOTIATE_PAUSE = int(os.environ.get("NEGOTIATE_PAUSE", "10"))  # seconds between rounds
+MAX_NEGOTIATE_ROUNDS = 4
+COOLDOWN_AFTER_FAIL = 60  # seconds before same pair can retry
+AGGRESSIVE_THRESHOLD = 0.5  # when >50% of agents have bought, enter aggressive mode
 
 _bedrock_client = None
 
@@ -883,38 +904,8 @@ def _get_bedrock():
 import json as _json  # noqa: E402
 
 
-def _llm_match(buyer: Agent, available_skills: list[Skill]) -> list[dict[str, Any]]:
-    """Call LLM to rank skills for a buyer. Returns list of {skill_id, score, reason}."""
-    if not available_skills:
-        return []
-
-    skills_desc = "\n".join(
-        f"- id={s.skill_id} | title={s.title} | description={s.description} | tags={','.join(s.tags)} | price=${s.list_price}"
-        for s in available_skills
-    )
-
-    prompt = f"""你是技能市集的配對引擎。請判斷以下買家最想買哪些技能。
-
-## 買家資料
-- 名稱：{buyer.display_name}
-- 人設：{buyer.persona_blurb}
-- 興趣標籤：{', '.join(buyer.interests_tags)}
-- 想找：{buyer.wants_blurb}
-
-## 可買技能清單
-{skills_desc}
-
-## 請回傳 JSON array（最多 3 筆），每筆格式：
-{{"skill_id": "...", "score": 1到10的整數, "reason": "一句話中文理由"}}
-
-評分標準：
-- 10 = 完美命中買家需求
-- 7-9 = 很相關、買家應該會想買
-- 4-6 = 有點相關但不確定
-- 1-3 = 無關
-
-只回傳 JSON array，不要其他文字。"""
-
+def _llm_call(prompt: str, max_tokens: int = 600) -> str:
+    """Single LLM call, returns raw text."""
     try:
         client = _get_bedrock()
         resp = client.invoke_model(
@@ -923,102 +914,274 @@ def _llm_match(buyer: Agent, available_skills: list[Skill]) -> list[dict[str, An
             accept="application/json",
             body=_json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 500,
+                "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": prompt}],
             }),
         )
         body = _json.loads(resp["body"].read())
-        text = body["content"][0]["text"].strip()
-        # Parse JSON array (handle potential markdown wrapping)
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        results = _json.loads(text)
-        if isinstance(results, list):
-            return results
+        return body["content"][0]["text"].strip()
     except Exception:
         import traceback
         traceback.print_exc()
-    return []
+        return ""
 
 
-async def _auto_matchmaker_tick() -> None:
-    """One tick: for each agent with budget, ask LLM for best match and auto-buy."""
+def _llm_match(buyer: Agent, available_skills: list[Skill]) -> list[dict[str, Any]]:
+    """LLM ranks skills for a buyer."""
+    if not available_skills:
+        return []
+    skills_desc = "\n".join(
+        f"- id={s.skill_id} | title={s.title} | description={s.description} | price=${s.list_price}"
+        for s in available_skills
+    )
+    prompt = f"""你是技能市集配對引擎。判斷買家最想買哪些技能。
+
+## 買家
+- 名稱：{buyer.display_name}
+- 人設：{buyer.persona_blurb}
+- 興趣：{', '.join(buyer.interests_tags)}
+- 想找：{buyer.wants_blurb}
+
+## 可買技能
+{skills_desc}
+
+回傳 JSON array（最多 3 筆）：{{"skill_id":"...","score":1-10,"reason":"一句話"}}
+只回 JSON，不要其他文字。"""
+    text = _llm_call(prompt, 400)
+    try:
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        results = _json.loads(text)
+        return results if isinstance(results, list) else []
+    except Exception:
+        return []
+
+
+def _llm_negotiate_round(
+    buyer: Agent, seller: Agent, skill: Skill,
+    current_price: int, round_num: int, history: list[str], aggressive: bool
+) -> dict[str, Any]:
+    """LLM generates one round of negotiation dialogue. Returns {action, price, buyer_says, seller_says}."""
+    mode = "搶購模式，出價更積極" if aggressive else "正常交易"
+    hist_text = "\n".join(history[-4:]) if history else "（第一輪）"
+
+    prompt = f"""你是技能市集的談判模擬器。根據雙方個性生成一輪對話。
+
+## 買家：{buyer.display_name}
+- 人設：{buyer.persona_blurb}
+- 談判風格：{buyer.negotiation_style or "普通"}
+- 預算上限：${buyer.max_bid}（這輪最多出這麼多）
+- 剩餘總預算：${buyer.budget}
+
+## 賣家：{seller.display_name}
+- 人設：{seller.persona_blurb}
+- 談判風格：{seller.negotiation_style or "普通"}
+- Skill：{skill.title}（定價 ${skill.list_price}）
+
+## 目前狀態
+- 模式：{mode}
+- 目前出價：${current_price}
+- 第 {round_num}/{MAX_NEGOTIATE_ROUNDS} 輪
+- 歷史：
+{hist_text}
+
+## 請回傳 JSON：
+{{
+  "action": "counter" 或 "accept" 或 "reject",
+  "new_price": 數字（如果 counter 的話新價格是多少，accept 就是成交價，reject 就 0）,
+  "buyer_says": "買家這輪說的話（1-2 句，符合他的個性，繁體中文）",
+  "seller_says": "賣家這輪說的話（1-2 句，符合他的個性，繁體中文）"
+}}
+
+規則：
+- 買家不會出超過 ${buyer.max_bid}
+- 賣家底價是 ${max(skill.list_price - 10, 5)}（不會低於這個價接受）
+- 第 {MAX_NEGOTIATE_ROUNDS} 輪還沒成交就自動 reject
+- {'搶購模式：買家更積極、更容易接受高價' if aggressive else '正常模式：會來回殺價'}
+- 對話要有性格、口語化、有趣
+
+只回 JSON。"""
+
+    text = _llm_call(prompt, 300)
+    try:
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        return _json.loads(text)
+    except Exception:
+        return {"action": "reject", "new_price": 0, "buyer_says": "算了", "seller_says": "下次吧"}
+
+
+# Track ongoing negotiations and cooldowns
+_active_negotiations: dict[str, Any] = {}  # negotiation_id -> state
+_pair_cooldowns: dict[str, float] = {}  # "buyer_id:skill_id" -> expires_at
+
+
+async def _market_engine_tick() -> None:
+    """One tick of the market engine: either advance an existing negotiation or start a new one."""
+    now = time.time()
+
+    # Phase detection
     agents = list(STORE.agents.values())
+    if len(agents) < 2:
+        return
+    bought_ratio = sum(1 for a in agents if a.purchases_count > 0) / len(agents)
+    aggressive = bought_ratio >= AGGRESSIVE_THRESHOLD
 
-    for agent in agents:
-        if agent.budget <= 0:
+    # First: advance any active negotiations
+    for neg_id in list(_active_negotiations.keys()):
+        neg = _active_negotiations[neg_id]
+        if now - neg["last_step_at"] < NEGOTIATE_PAUSE:
+            continue  # not time yet
+
+        buyer = STORE.agents.get(neg["buyer_id"])
+        seller = STORE.agents.get(neg["seller_id"])
+        skill = STORE.skills.get(neg["skill_id"])
+        if not buyer or not seller or not skill:
+            del _active_negotiations[neg_id]
             continue
 
-        # Find affordable, un-owned skills from others
+        neg["round"] += 1
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, _llm_negotiate_round,
+            buyer, seller, skill, neg["price"], neg["round"], neg["history"], aggressive
+        )
+
+        action = result.get("action", "reject")
+        new_price = result.get("new_price", neg["price"])
+        buyer_says = result.get("buyer_says", "...")
+        seller_says = result.get("seller_says", "...")
+
+        neg["history"].append(f"[{buyer.display_name}] {buyer_says}")
+        neg["history"].append(f"[{seller.display_name}] {seller_says}")
+        neg["price"] = new_price
+        neg["last_step_at"] = now
+
+        # Push negotiate event for UI
+        STORE.push_event("negotiate", {
+            "neg_id": neg_id,
+            "round": neg["round"],
+            "buyer_id": buyer.agent_id,
+            "buyer_name": buyer.display_name,
+            "seller_id": seller.agent_id,
+            "seller_name": seller.display_name,
+            "skill_title": skill.title,
+            "price": new_price,
+            "buyer_says": buyer_says,
+            "seller_says": seller_says,
+            "action": action,
+        })
+
+        if action == "accept" and new_price <= buyer.budget and new_price <= buyer.max_bid:
+            # Deal!
+            async with STORE._lock:
+                if skill.skill_id in buyer.owned_skill_ids or new_price > buyer.budget:
+                    del _active_negotiations[neg_id]
+                    continue
+                buyer.budget -= new_price
+                buyer.purchases_count += 1
+                buyer.owned_skill_ids.add(skill.skill_id)
+                seller.revenue += new_price
+                skill.times_bought += 1
+                if new_price > skill.highest_sale_price:
+                    skill.highest_sale_price = new_price
+                    skill.highest_sale_buyer = buyer.display_name
+            STORE.push_event("purchase", {
+                "offer_id": f"mkt_{uuid.uuid4().hex[:6]}",
+                "skill_id": skill.skill_id,
+                "skill_title": skill.title,
+                "price": new_price,
+                "buyer_id": buyer.agent_id,
+                "buyer_name": buyer.display_name,
+                "seller_id": seller.agent_id,
+                "seller_name": seller.display_name,
+                "auto": True,
+                "match_reasons": neg.get("reason", ""),
+            })
+            del _active_negotiations[neg_id]
+
+        elif action == "reject" or neg["round"] >= MAX_NEGOTIATE_ROUNDS:
+            # Failed — cooldown this pair
+            STORE.push_event("negotiate_fail", {
+                "buyer_name": buyer.display_name,
+                "seller_name": seller.display_name,
+                "skill_title": skill.title,
+            })
+            _pair_cooldowns[f"{buyer.agent_id}:{skill.skill_id}"] = now + COOLDOWN_AFTER_FAIL
+            del _active_negotiations[neg_id]
+
+        return  # only advance one negotiation per tick (stagger visuals)
+
+    # No active negotiation to advance — try starting a new one
+    if len(_active_negotiations) >= 2:
+        return  # max 2 concurrent negotiations
+
+    import random as _rnd
+    _rnd.shuffle(agents)
+    for buyer in agents:
+        if buyer.budget <= 0:
+            continue
         available = [
             s for s in STORE.skills.values()
-            if s.seller_id != agent.agent_id
-            and s.skill_id not in agent.owned_skill_ids
-            and 0 < s.list_price <= agent.budget
+            if s.seller_id != buyer.agent_id
+            and s.skill_id not in buyer.owned_skill_ids
+            and s.list_price <= min(buyer.budget, buyer.max_bid)
+            and f"{buyer.agent_id}:{s.skill_id}" not in _pair_cooldowns
+            or (f"{buyer.agent_id}:{s.skill_id}" in _pair_cooldowns
+                and _pair_cooldowns[f"{buyer.agent_id}:{s.skill_id}"] < now)
         ]
         if not available:
             continue
 
-        # Call LLM (blocking IO, run in thread to not freeze event loop)
         loop = asyncio.get_event_loop()
-        matches = await loop.run_in_executor(None, _llm_match, agent, available)
+        matches = await loop.run_in_executor(None, _llm_match, buyer, available[:10])
+        best = next((m for m in matches if m.get("score", 0) >= 7), None)
+        if not best:
+            continue
 
-        for match in matches:
-            sid = match.get("skill_id", "")
-            score = match.get("score", 0)
-            reason = match.get("reason", "")
-            if score < MATCHMAKER_MIN_SCORE:
-                continue
+        skill = STORE.skills.get(best["skill_id"])
+        if not skill:
+            continue
+        seller = STORE.agents.get(skill.seller_id)
+        if not seller:
+            continue
 
-            skill = STORE.skills.get(sid)
-            if not skill or skill.list_price > agent.budget or sid in agent.owned_skill_ids:
-                continue
-
-            # Execute trade
-            async with STORE._lock:
-                if skill.list_price > agent.budget or sid in agent.owned_skill_ids:
-                    continue
-                price = skill.list_price
-                agent.budget -= price
-                agent.purchases_count += 1
-                agent.owned_skill_ids.add(sid)
-                seller = STORE.agents.get(skill.seller_id)
-                if seller:
-                    seller.revenue += price
-                skill.times_bought += 1
-                if price > skill.highest_sale_price:
-                    skill.highest_sale_price = price
-
-                STORE.push_event(
-                    "purchase",
-                    {
-                        "offer_id": f"auto_{uuid.uuid4().hex[:6]}",
-                        "skill_id": sid,
-                        "skill_title": skill.title,
-                        "price": price,
-                        "buyer_id": agent.agent_id,
-                        "buyer_name": agent.display_name,
-                        "seller_id": skill.seller_id,
-                        "seller_name": seller.display_name if seller else skill.seller_id,
-                        "auto": True,
-                        "match_reasons": [reason],
-                    },
-                )
-
-            # One trade per agent per tick
-            await asyncio.sleep(1)
-            break
+        # Start negotiation
+        start_price = int(skill.list_price * (0.9 if aggressive else 0.7))
+        start_price = max(start_price, 5)
+        neg_id = f"neg_{uuid.uuid4().hex[:6]}"
+        _active_negotiations[neg_id] = {
+            "buyer_id": buyer.agent_id,
+            "seller_id": seller.agent_id,
+            "skill_id": skill.skill_id,
+            "price": start_price,
+            "round": 0,
+            "history": [],
+            "reason": best.get("reason", ""),
+            "last_step_at": now,
+        }
+        STORE.push_event("negotiate_start", {
+            "neg_id": neg_id,
+            "buyer_id": buyer.agent_id,
+            "buyer_name": buyer.display_name,
+            "seller_id": seller.agent_id,
+            "seller_name": seller.display_name,
+            "skill_id": skill.skill_id,
+            "skill_title": skill.title,
+            "reason": best.get("reason", ""),
+        })
+        return  # one new negotiation per tick
 
 
-async def _matchmaker_loop() -> None:
-    await asyncio.sleep(5)  # initial grace period for server startup
+async def _market_loop() -> None:
+    await asyncio.sleep(8)  # grace period
     while True:
         try:
-            await _auto_matchmaker_tick()
+            await _market_engine_tick()
         except Exception:
             import traceback
             traceback.print_exc()
-        await asyncio.sleep(MATCHMAKER_INTERVAL)
+        await asyncio.sleep(MARKET_TICK)
 
 
 # ---------------------------------------------------------------------------
@@ -1032,11 +1195,10 @@ mcp_app = mcp.http_app(path="/", transport="streamable-http", stateless_http=Tru
 
 @asynccontextmanager
 async def _lifespan(app_instance):
-    # Must enter mcp_app's lifespan so the StreamableHTTP session manager starts.
     async with mcp_app.lifespan(app_instance):
         task = None
-        if MATCHMAKER_ENABLED:
-            task = asyncio.create_task(_matchmaker_loop())
+        if MARKET_ENABLED:
+            task = asyncio.create_task(_market_loop())
         yield
         if task:
             task.cancel()
@@ -1051,17 +1213,20 @@ async def api_state(since: float = 0.0) -> dict[str, Any]:
     new_events = [
         {"kind": e.kind, "at": e.at, **e.payload} for e in STORE.events if e.at > since
     ]
-    agents = [
-        {
+    agents = []
+    for a in STORE.agents.values():
+        my_skills = [s for s in STORE.skills.values() if s.seller_id == a.agent_id]
+        agents.append({
             "agent_id": a.agent_id,
             "display_name": a.display_name,
             "budget": a.budget,
             "revenue": a.revenue,
             "purchases": a.purchases_count,
-            "listings": sum(1 for s in STORE.skills.values() if s.seller_id == a.agent_id),
-        }
-        for a in STORE.agents.values()
-    ]
+            "listings": len(my_skills),
+            "interests_tags": a.interests_tags,
+            "wants_blurb": a.wants_blurb,
+            "selling_titles": "、".join(s.title for s in my_skills) if my_skills else "",
+        })
     return {
         "now": time.time(),
         "agents": agents,

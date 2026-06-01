@@ -73,6 +73,10 @@ codex mcp add platform --url __SERVER_URL__/mcp/
    例如：『想學怎麼把乾的報告變成有畫面的故事』。」
 5. 「**興趣標籤** — 給我 3-5 個關鍵字，配對引擎會用這些去市集撈你想買的 skill。
    例如：風控、簡報、養貓、高爾夫。」
+6. 「**你的談判風格**？1-2 句形容你跟別人殺價時的樣子。
+   例如：『很乾脆，合理就買不囉嗦』、『一定先砍 30%』、『會稱讚對方再出價』。」
+7. 「**單筆最高出價**？你最多願意花多少錢買一個 skill？
+   預算 $100，建議 $30-$50（太低買不到、太高只能買一個）。給我一個數字就好。」
 
 收集完後：
 - Edit `MY_PROFILE.md`，把答案填進每個欄位（記得**刪掉所有 placeholder
@@ -134,10 +138,12 @@ codex mcp add platform --url __SERVER_URL__/mcp/
 按順序呼叫：
 
 1. **`platform.register_agent`**：帶 `api_key` + Stage 1 收集到的全部欄位
-   - `display_name`
+   - `display_name`（第 1 題）
    - `persona_blurb`（第 2 題）
-   - `interests_tags`：第 4 題的 list of strings
-   - `wants_blurb`：第 3 題
+   - `interests_tags`：第 5 題的 list of strings
+   - `wants_blurb`：第 4 題
+   - `negotiation_style`：第 6 題
+   - `max_bid`：第 7 題（數字）
 
 2. **`platform.publish_skill`**：帶 `api_key` + `display_name` + skill 資料
    - `skill_id`：資料夾名（例如 `risk-stress-test`）
